@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>가계부</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      color: #fff;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* ── 바다 배경 ── */
+    .ocean-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: linear-gradient(
+        180deg,
+        #87ceeb 0%,
+        #60b8e8 25%,
+        #1a6fa8 52%,
+        #0a4a7a 75%,
+        #063558 100%
+      );
+      overflow: hidden;
+    }
+
+    /* 태양 */
+    .sun {
+      position: absolute;
+      top: 7%;
+      right: 14%;
+      width: 90px;
+      height: 90px;
+      background: radial-gradient(circle, #fffde0 20%, #ffd700 55%, rgba(255,215,0,0) 100%);
+      border-radius: 50%;
+      box-shadow: 0 0 70px 25px rgba(255,220,60,0.45);
+      animation: sunPulse 4s ease-in-out infinite;
+    }
+    @keyframes sunPulse {
+      0%,100% { box-shadow: 0 0 70px 25px rgba(255,220,60,0.45); }
+      50%      { box-shadow: 0 0 100px 40px rgba(255,220,60,0.65); }
+    }
+
+    /* 햇빛 반사 줄기 */
+    .sun-rays {
+      position: absolute;
+      top: 7%;
+      right: 14%;
+      width: 90px;
+      height: 90px;
+    }
+    .sun-rays::before, .sun-rays::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 2px;
+      background: linear-gradient(to bottom, rgba(255,240,100,0.5), rgba(255,240,100,0) 80%);
+      transform-origin: top center;
+      animation: rayRotate 8s linear infinite;
+    }
+    .sun-rays::before { height: 300px; transform: translateX(-50%) rotate(-20deg); }
+    .sun-rays::after  { height: 240px; transform: translateX(-50%) rotate(15deg); animation-delay: -4s; }
+    @keyframes rayRotate {
+      0%   { opacity: 0.6; }
+      50%  { opacity: 0.15; }
+      100% { opacity: 0.6; }
+    }
+
+    /* 구름 */
+    .cloud {
+      position: absolute;
+      background: rgba(255,255,255,0.82);
+      border-radius: 50px;
+      animation: cloudDrift linear infinite;
+    }
+    .cloud::before, .cloud::after {
+      content: '';
+      position: absolute;
+      background: rgba(255,255,255,0.82);
+      border-radius: 50%;
+    }
+    .c1 { width:120px; height:32px; top:12%; left:-140px; animation-duration:40s; animation-delay:0s; }
+    .c1::before { width:60px; height:50px; top:-28px; left:20px; }
+    .c1::after  { width:45px; height:38px; top:-20px; left:60px; }
+
+    .c2 { width:90px;  height:24px; top:18%; left:-110px; animation-duration:55s; animation-delay:-20s; opacity:0.7; }
+    .c2::before { width:45px; height:38px; top:-22px; left:14px; }
+    .c2::after  { width:34px; height:28px; top:-15px; left:46px; }
+
+    .c3 { width:70px;  height:20px; top:8%;  left:-90px;  animation-duration:35s; animation-delay:-10s; opacity:0.6; }
+    .c3::before { width:35px; height:30px; top:-17px; left:10px; }
+    .c3::after  { width:28px; height:22px; top:-12px; left:36px; }
+
+    @keyframes cloudDrift {
+      from { transform: translateX(0); }
+      to   { transform: translateX(calc(100vw + 200px)); }
+    }
+
+    /* 수면 빛 반짝임 */
+    .sparkle {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.9);
+      animation: sparkle var(--dur) ease-in-out infinite var(--delay);
+    }
+    @keyframes sparkle {
+      0%,100% { opacity:0; transform:scale(0.4); }
+      50%      { opacity:1; transform:scale(1.6); }
+    }
+
+    /* 파도 */
+    .wave {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 200%;
+      height: 140px;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 140'%3E%3Cpath fill='rgba(255,255,255,0.13)' d='M0,70 C200,120 400,20 600,70 C800,120 1000,20 1200,70 C1320,100 1380,55 1440,70 L1440,140 L0,140 Z'/%3E%3C/svg%3E") repeat-x;
+      background-size: 50% 100%;
+      animation: waveDrift var(--spd) linear infinite;
+    }
+    .wave1 { --spd:9s;  bottom:12px; opacity:0.8; }
+    .wave2 { --spd:13s; bottom:0;    opacity:0.5; animation-direction:reverse; }
+    .wave3 { --spd:6s;  bottom:24px; opacity:0.35; }
+    @keyframes waveDrift {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+
+    /* ── 컨텐츠 레이어 ── */
+    header, .container { position: relative; z-index: 1; }
+
+    header {
+      background: rgba(5, 40, 75, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      color: #fff;
+      padding: 20px 28px;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.4);
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 24px 16px 60px;
+    }
+
+    /* 유리 패널 공통 */
+    .glass {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.28);
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+    }
+
+    /* 요약 카드 */
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      padding: 18px 14px;
+      text-align: center;
+    }
+
+    .card .label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.75);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .card .amount { font-size: 20px; font-weight: 700; }
+    .card.income  .amount { color: #7fffb0; }
+    .card.expense .amount { color: #ffadad; }
+    .card.balance .amount { color: #fff; }
+
+    /* 입력 폼 */
+    .form-box {
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .form-box h2 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      color: rgba(255,255,255,0.9);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .form-row.single { grid-template-columns: 1fr; }
+
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+      background: rgba(255,255,255,0.18);
+      color: #fff;
+      transition: border 0.2s, background 0.2s;
+    }
+    input::placeholder { color: rgba(255,255,255,0.5); }
+    input:focus, select:focus {
+      border-color: rgba(255,255,255,0.7);
+      background: rgba(255,255,255,0.25);
+    }
+    select option { background: #0a4a7a; color: #fff; }
+
+    .type-toggle { display: flex; gap: 8px; margin-bottom: 10px; }
+
+    .type-btn {
+      flex: 1;
+      padding: 10px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.75);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .type-btn.active-income  { border-color:#7fffb0; background:rgba(127,255,176,0.22); color:#7fffb0; }
+    .type-btn.active-expense { border-color:#ffadad; background:rgba(255,173,173,0.22); color:#ffadad; }
+
+    .submit-btn {
+      width: 100%;
+      padding: 12px;
+      background: rgba(255,255,255,0.22);
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: background 0.2s;
+      letter-spacing: 0.3px;
+    }
+    .submit-btn:hover { background: rgba(255,255,255,0.32); }
+
+    /* 필터 바 */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+    .filter-bar select { width: auto; flex: 1; }
+
+    .clear-btn {
+      padding: 10px 14px;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.7);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .clear-btn:hover { border-color:#ffadad; color:#ffadad; background:rgba(255,173,173,0.15); }
+
+    /* 거래 목록 */
+    .list-box { overflow: hidden; }
+
+    .list-header {
+      padding: 16px 20px 12px;
+      font-size: 15px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.9);
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+    }
+
+    .empty {
+      text-align: center;
+      padding: 48px 20px;
+      color: rgba(255,255,255,0.45);
+      font-size: 14px;
+    }
+
+    .tx-item {
+      display: flex;
+      align-items: center;
+      padding: 14px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      gap: 12px;
+    }
+    .tx-item:last-child { border-bottom: none; }
+
+    .tx-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .tx-icon.income  { background: rgba(127,255,176,0.2); }
+    .tx-icon.expense { background: rgba(255,173,173,0.2); }
+
+    .tx-info { flex: 1; min-width: 0; }
+
+    .tx-desc {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tx-meta { font-size: 12px; color: rgba(255,255,255,0.55); margin-top: 2px; }
+
+    .tx-right { text-align: right; }
+    .tx-amount { font-size: 15px; font-weight: 700; }
+    .tx-amount.income  { color: #7fffb0; }
+    .tx-amount.expense { color: #ffadad; }
+    .tx-date-label { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.25);
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 4px;
+      transition: color 0.2s;
+      line-height: 1;
+    }
+    .delete-btn:hover { color: #ffadad; }
+
+    @media (max-width: 480px) {
+      .summary { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; }
+      .card .amount { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 바다 배경 -->
+<div class="ocean-bg">
+  <div class="sun"></div>
+  <div class="sun-rays"></div>
+  <!-- 구름 -->
+  <div class="cloud c1"></div>
+  <div class="cloud c2"></div>
+  <div class="cloud c3"></div>
+  <!-- 수면 반짝임 (JS로 생성) -->
+  <div id="sparkles"></div>
+  <!-- 파도 -->
+  <div class="wave wave1"></div>
+  <div class="wave wave2"></div>
+  <div class="wave wave3"></div>
+</div>
+
+<header>🌊 가계부</header>
+
+<div class="container">
+
+  <!-- 요약 -->
+  <div class="summary">
+    <div class="card glass income">
+      <div class="label">총 수입</div>
+      <div class="amount" id="total-income">₩0</div>
+    </div>
+    <div class="card glass expense">
+      <div class="label">총 지출</div>
+      <div class="amount" id="total-expense">₩0</div>
+    </div>
+    <div class="card glass balance">
+      <div class="label">잔액</div>
+      <div class="amount" id="balance">₩0</div>
+    </div>
+  </div>
+
+  <!-- 입력 폼 -->
+  <div class="form-box glass">
+    <h2>거래 추가</h2>
+    <div class="type-toggle">
+      <button class="type-btn active-income" id="btn-income" onclick="setType('income')">＋ 수입</button>
+      <button class="type-btn" id="btn-expense" onclick="setType('expense')">－ 지출</button>
+    </div>
+    <div class="form-row">
+      <input type="date" id="tx-date">
+      <select id="tx-category"><option value="">카테고리</option></select>
+    </div>
+    <div class="form-row single">
+      <input type="text" id="tx-desc" placeholder="내용 (예: 카페라떼)">
+    </div>
+    <div class="form-row single">
+      <input type="number" id="tx-amount" placeholder="금액 (원)" min="0">
+    </div>
+    <button class="submit-btn" onclick="addTransaction()">추가하기</button>
+  </div>
+
+  <!-- 필터 -->
+  <div class="filter-bar">
+    <select id="filter-month" onchange="render()">
+      <option value="">전체 기간</option>
+    </select>
+    <select id="filter-type" onchange="render()">
+      <option value="">전체</option>
+      <option value="income">수입만</option>
+      <option value="expense">지출만</option>
+    </select>
+    <button class="clear-btn" onclick="clearAll()">전체 삭제</button>
+  </div>
+
+  <!-- 목록 -->
+  <div class="list-box glass">
+    <div class="list-header">거래 내역</div>
+    <div id="tx-list"></div>
+  </div>
+
+</div>
+
+<script>
+  // 반짝임 생성
+  (function() {
+    const wrap = document.getElementById('sparkles');
+    for (let i = 0; i < 30; i++) {
+      const s = document.createElement('div');
+      s.className = 'sparkle';
+      const sz = Math.random() * 3 + 1.5;
+      s.style.cssText = `
+        width:${sz}px; height:${sz}px;
+        left:${Math.random()*100}%;
+        top:${50 + Math.random()*45}%;
+        --dur:${(Math.random()*2.5+1.5).toFixed(1)}s;
+        --delay:-${(Math.random()*3).toFixed(1)}s;
+      `;
+      wrap.appendChild(s);
+    }
+  })();
+
+  const CATEGORIES = {
+    income:  ['급여','부업','용돈','이자/배당','기타수입'],
+    expense: ['식비','카페/음료','교통','쇼핑','의료','문화/여가','통신','공과금','기타지출']
+  };
+
+  const ICONS = {
+    income:'📈', expense:'📉',
+    '급여':'💼','부업':'🛠️','용돈':'🎁','이자/배당':'📊','기타수입':'💰',
+    '식비':'🍚','카페/음료':'☕','교통':'🚌','쇼핑':'🛍️',
+    '의료':'💊','문화/여가':'🎬','통신':'📱','공과금':'🏠','기타지출':'💸'
+  };
+
+  let currentType = 'income';
+  let transactions = JSON.parse(localStorage.getItem('ggm_tx') || '[]');
+
+  function setType(type) {
+    currentType = type;
+    document.getElementById('btn-income').className  = 'type-btn' + (type==='income'  ? ' active-income'  : '');
+    document.getElementById('btn-expense').className = 'type-btn' + (type==='expense' ? ' active-expense' : '');
+    updateCategories();
+  }
+
+  function updateCategories() {
+    const sel = document.getElementById('tx-category');
+    sel.innerHTML = '<option value="">카테고리</option>';
+    CATEGORIES[currentType].forEach(c => {
+      const o = document.createElement('option');
+      o.value = c; o.textContent = c;
+      sel.appendChild(o);
+    });
+  }
+
+  function save() { localStorage.setItem('ggm_tx', JSON.stringify(transactions)); }
+
+  function fmt(n) { return '₩' + Math.abs(n).toLocaleString('ko-KR'); }
+
+  function addTransaction() {
+    const date   = document.getElementById('tx-date').value;
+    const category = document.getElementById('tx-category').value;
+    const desc   = document.getElementById('tx-desc').value.trim();
+    const amount = parseFloat(document.getElementById('tx-amount').value);
+
+    if (!date)            { alert('날짜를 선택하세요.');       return; }
+    if (!desc)            { alert('내용을 입력하세요.');       return; }
+    if (!amount || amount <= 0) { alert('올바른 금액을 입력하세요.'); return; }
+
+    transactions.unshift({
+      id: Date.now(), type: currentType, date,
+      category: category || (currentType==='income' ? '기타수입' : '기타지출'),
+      desc, amount
+    });
+    save();
+    document.getElementById('tx-desc').value   = '';
+    document.getElementById('tx-amount').value = '';
+    updateMonthFilter();
+    render();
+  }
+
+  function deleteTransaction(id) {
+    transactions = transactions.filter(t => t.id !== id);
+    save(); updateMonthFilter(); render();
+  }
+
+  function clearAll() {
+    if (!transactions.length) return;
+    if (confirm('모든 거래 내역을 삭제하시겠습니까?')) {
+      transactions = []; save(); updateMonthFilter(); render();
+    }
+  }
+
+  function updateMonthFilter() {
+    const sel = document.getElementById('filter-month');
+    const cur = sel.value;
+    const months = [...new Set(transactions.map(t => t.date.slice(0,7)))].sort().reverse();
+    sel.innerHTML = '<option value="">전체 기간</option>';
+    months.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m;
+      const [y, mo] = m.split('-');
+      o.textContent = `${y}년 ${parseInt(mo)}월`;
+      sel.appendChild(o);
+    });
+    if (months.includes(cur)) sel.value = cur;
+  }
+
+  function render() {
+    const mf = document.getElementById('filter-month').value;
+    const tf = document.getElementById('filter-type').value;
+    const filtered = transactions.filter(t =>
+      (!mf || t.date.startsWith(mf)) && (!tf || t.type === tf)
+    );
+
+    const income  = filtered.filter(t=>t.type==='income') .reduce((s,t)=>s+t.amount,0);
+    const expense = filtered.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+    const balance = income - expense;
+
+    document.getElementById('total-income').textContent  = fmt(income);
+    document.getElementById('total-expense').textContent = fmt(expense);
+    const balEl = document.getElementById('balance');
+    balEl.textContent  = (balance < 0 ? '-' : '') + fmt(balance);
+    balEl.style.color  = balance < 0 ? '#ffadad' : '#fff';
+
+    const list = document.getElementById('tx-list');
+    if (!filtered.length) {
+      list.innerHTML = '<div class="empty">거래 내역이 없습니다.</div>';
+      return;
+    }
+
+    list.innerHTML = filtered.map(t => {
+      const icon = ICONS[t.category] || ICONS[t.type];
+      const sign = t.type === 'income' ? '+' : '-';
+      const [y, m, d] = t.date.split('-');
+      return `
+        <div class="tx-item">
+          <div class="tx-icon ${t.type}">${icon}</div>
+          <div class="tx-info">
+            <div class="tx-desc">${t.desc}</div>
+            <div class="tx-meta">${t.category}</div>
+          </div>
+          <div class="tx-right">
+            <div class="tx-amount ${t.type}">${sign}${fmt(t.amount)}</div>
+            <div class="tx-date-label">${y}.${m}.${d}</div>
+          </div>
+          <button class="delete-btn" onclick="deleteTransaction(${t.id})" title="삭제">×</button>
+        </div>`;
+    }).join('');
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('tx-date').value = today;
+  updateCategories();
+  updateMonthFilter();
+  render();
+</script>
+</body>
+</html>
