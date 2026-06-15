@@ -382,7 +382,13 @@
   <div class="wave wave3"></div>
 </div>
 
-<header>🌊 가계부</header>
+<header>🌊 가계부
+  <button id="music-btn" onclick="toggleMusic()" title="음악 켜기"
+    style="background:none;border:none;color:rgba(255,255,255,0.65);font-size:22px;
+           cursor:pointer;float:right;padding:0;line-height:1;margin-top:1px;
+           transition:color .2s;" onmouseover="this.style.color='#fff'"
+    onmouseout="this.style.color='rgba(255,255,255,0.65)'">🎵</button>
+</header>
 
 <div class="container">
 
@@ -621,6 +627,86 @@
   document.getElementById('tx-date').value = today;
   updateCategories();
   loadTransactions();
+
+  // ── 배경 음악 (Web Audio API, 저작권 없음) ──
+  let audioCtx = null, masterGain = null;
+  let musicActive = false, loopTimer = null;
+  const BPM = 108, B = 60 / BPM;
+
+  // C장조 멜로디: [주파수, 박자]
+  const MELODY = [
+    [329.63,.5],[392.00,.5],[523.25,1],
+    [587.33,.5],[523.25,.5],[493.88,1],
+    [440.00,.5],[392.00,.5],[440.00,.5],[392.00,.5],[329.63,.5],[392.00,.5],[293.66,1],
+    [392.00,.5],[329.63,.5],[392.00,1],
+    [440.00,.5],[392.00,.5],[349.23,1],
+    [329.63,.5],[293.66,.5],[329.63,.5],[392.00,.5],[261.63,2]
+  ];
+  // 베이스
+  const BASS = [
+    [130.81,2],[98.00,2],[110.00,2],[87.31,2],
+    [130.81,2],[98.00,2],[87.31,2],[130.81,2]
+  ];
+  // 코드 패드
+  const CHORDS = [
+    [[261.63,329.63,392.00],4],
+    [[196.00,246.94,293.66],4],
+    [[220.00,261.63,329.63],4],
+    [[174.61,220.00,261.63],4]
+  ];
+
+  function playNote(freq, t, dur, type, vol) {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + Math.min(0.06, dur * B * 0.25));
+    g.gain.setValueAtTime(vol * 0.75, t + dur * B * 0.65);
+    g.gain.linearRampToValueAtTime(0, t + dur * B);
+    osc.connect(g); g.connect(masterGain);
+    osc.start(t); osc.stop(t + dur * B + 0.05);
+  }
+
+  function scheduleLoop(startTime) {
+    let t = startTime;
+    for (const [freq, dur] of MELODY) { playNote(freq, t, dur, 'sine', 0.13); t += dur * B; }
+    t = startTime;
+    for (const [freq, dur] of BASS)   { playNote(freq, t, dur, 'triangle', 0.09); t += dur * B; }
+    t = startTime;
+    for (const [freqs, dur] of CHORDS) {
+      for (const f of freqs) playNote(f, t, dur, 'sine', 0.028);
+      t += dur * B;
+    }
+    const total = MELODY.reduce((s,[,d]) => s + d, 0) * B;
+    loopTimer = setTimeout(() => {
+      if (musicActive) scheduleLoop(audioCtx.currentTime + 0.05);
+    }, (total - 0.3) * 1000);
+  }
+
+  function toggleMusic() {
+    const btn = document.getElementById('music-btn');
+    if (!musicActive) {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = audioCtx.createGain();
+        const comp = audioCtx.createDynamicsCompressor();
+        comp.threshold.value = -6; comp.ratio.value = 4;
+        masterGain.connect(comp); comp.connect(audioCtx.destination);
+        masterGain.gain.value = 0.55;
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      musicActive = true;
+      scheduleLoop(audioCtx.currentTime + 0.1);
+      btn.textContent = '🔊'; btn.title = '음악 끄기';
+    } else {
+      musicActive = false;
+      clearTimeout(loopTimer);
+      masterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.4);
+      setTimeout(() => { masterGain.gain.value = 0.55; }, 500);
+      btn.textContent = '🎵'; btn.title = '음악 켜기';
+    }
+  }
 </script>
 </body>
 </html>
