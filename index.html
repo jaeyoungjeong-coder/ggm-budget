@@ -443,7 +443,13 @@
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+  // ── Supabase 초기화 ──
+  const SUPABASE_URL = 'https://fqtmbthlwmmmcihgdnhl.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxdG1idGhsd21tbWNpaGdkbmhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0ODEwMTMsImV4cCI6MjA5NzA1NzAxM30.RfX3FgMtfDE7S_fa2Li8JKOqpeuE48xJLq_xTB-Ran0';
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
   // 반짝임 생성
   (function() {
     const wrap = document.getElementById('sparkles');
@@ -475,7 +481,19 @@
   };
 
   let currentType = 'income';
-  let transactions = JSON.parse(localStorage.getItem('ggm_tx') || '[]');
+  let transactions = [];
+
+  async function loadTransactions() {
+    const { data, error } = await db
+      .from('transactions')
+      .select('*')
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) { console.error(error); return; }
+    transactions = data.map(t => ({ ...t, desc: t.description }));
+    updateMonthFilter();
+    render();
+  }
 
   function setType(type) {
     currentType = type;
@@ -494,42 +512,51 @@
     });
   }
 
-  function save() { localStorage.setItem('ggm_tx', JSON.stringify(transactions)); }
-
   function fmt(n) { return '₩' + Math.abs(n).toLocaleString('ko-KR'); }
 
-  function addTransaction() {
-    const date   = document.getElementById('tx-date').value;
+  async function addTransaction() {
+    const date     = document.getElementById('tx-date').value;
     const category = document.getElementById('tx-category').value;
-    const desc   = document.getElementById('tx-desc').value.trim();
-    const amount = parseFloat(document.getElementById('tx-amount').value);
+    const desc     = document.getElementById('tx-desc').value.trim();
+    const amount   = parseFloat(document.getElementById('tx-amount').value);
 
-    if (!date)            { alert('날짜를 선택하세요.');       return; }
-    if (!desc)            { alert('내용을 입력하세요.');       return; }
+    if (!date)                  { alert('날짜를 선택하세요.');       return; }
+    if (!desc)                  { alert('내용을 입력하세요.');       return; }
     if (!amount || amount <= 0) { alert('올바른 금액을 입력하세요.'); return; }
 
-    transactions.unshift({
-      id: Date.now(), type: currentType, date,
+    const { data, error } = await db.from('transactions').insert([{
+      type: currentType,
+      date,
       category: category || (currentType==='income' ? '기타수입' : '기타지출'),
-      desc, amount
-    });
-    save();
+      description: desc,
+      amount
+    }]).select().single();
+
+    if (error) { alert('저장 실패: ' + error.message); return; }
+
+    transactions.unshift({ ...data, desc: data.description });
     document.getElementById('tx-desc').value   = '';
     document.getElementById('tx-amount').value = '';
     updateMonthFilter();
     render();
   }
 
-  function deleteTransaction(id) {
+  async function deleteTransaction(id) {
+    const { error } = await db.from('transactions').delete().eq('id', id);
+    if (error) { alert('삭제 실패: ' + error.message); return; }
     transactions = transactions.filter(t => t.id !== id);
-    save(); updateMonthFilter(); render();
+    updateMonthFilter();
+    render();
   }
 
-  function clearAll() {
+  async function clearAll() {
     if (!transactions.length) return;
-    if (confirm('모든 거래 내역을 삭제하시겠습니까?')) {
-      transactions = []; save(); updateMonthFilter(); render();
-    }
+    if (!confirm('모든 거래 내역을 삭제하시겠습니까?')) return;
+    const { error } = await db.from('transactions').delete().neq('id', 0);
+    if (error) { alert('삭제 실패: ' + error.message); return; }
+    transactions = [];
+    updateMonthFilter();
+    render();
   }
 
   function updateMonthFilter() {
@@ -554,15 +581,15 @@
       (!mf || t.date.startsWith(mf)) && (!tf || t.type === tf)
     );
 
-    const income  = filtered.filter(t=>t.type==='income') .reduce((s,t)=>s+t.amount,0);
-    const expense = filtered.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+    const income  = filtered.filter(t=>t.type==='income') .reduce((s,t)=>s+Number(t.amount),0);
+    const expense = filtered.filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount),0);
     const balance = income - expense;
 
     document.getElementById('total-income').textContent  = fmt(income);
     document.getElementById('total-expense').textContent = fmt(expense);
     const balEl = document.getElementById('balance');
-    balEl.textContent  = (balance < 0 ? '-' : '') + fmt(balance);
-    balEl.style.color  = balance < 0 ? '#ffadad' : '#fff';
+    balEl.textContent = (balance < 0 ? '-' : '') + fmt(balance);
+    balEl.style.color = balance < 0 ? '#ffadad' : '#fff';
 
     const list = document.getElementById('tx-list');
     if (!filtered.length) {
@@ -593,8 +620,7 @@
   const today = new Date().toISOString().slice(0, 10);
   document.getElementById('tx-date').value = today;
   updateCategories();
-  updateMonthFilter();
-  render();
+  loadTransactions();
 </script>
 </body>
 </html>
