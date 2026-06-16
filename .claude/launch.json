@@ -6,6 +6,13 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "-p", "3000", "."],
       "port": 3000
+    },
+    {
+      "name": "goguma-market",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "goguma-market", "run", "dev"],
+      "port": 3001,
+      "autoPort": true
     }
   ]
 }
